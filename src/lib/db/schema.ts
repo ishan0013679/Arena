@@ -16,7 +16,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn, PgTableExtraConfigValue } from "drizzle-orm/pg-core";
-import { relations, sql } from "drizzle-orm";
+import { defineRelations, sql } from "drizzle-orm";
 
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 
@@ -391,92 +391,85 @@ export const tournamentRuleAcceptances = pgTable(
 // Drizzle relations
 // ---------------------------------------------------------------------------
 
-export const gamesRelations = relations(games, ({ many }) => ({
-  modes: many(gameModes),
-}));
-
-export const gameModesRelations = relations(gameModes, ({ one, many }) => ({
-  game: one(games, {
-    fields: [gameModes.game_id],
-    references: [games.id],
-  }),
-  teamConfigurations: many(modeTeamConfigurations),
-}));
-
-export const modeTeamConfigurationsRelations = relations(
-  modeTeamConfigurations,
-  ({ one }) => ({
-    mode: one(gameModes, {
-      fields: [modeTeamConfigurations.mode_id],
-      references: [gameModes.id],
-    }),
-  }),
-);
-
-export const tournamentsRelations = relations(tournaments, ({ one, many }) => ({
-  gameMode: one(gameModes, {
-    fields: [tournaments.game_mode_id],
-    references: [gameModes.id],
-  }),
-  teamConfiguration: one(modeTeamConfigurations, {
-    fields: [tournaments.mode_team_configuration_id],
-    references: [modeTeamConfigurations.id],
-  }),
-  creator: one(profiles, {
-    fields: [tournaments.created_by],
-    references: [profiles.user_id],
-  }),
-  ruleVersions: many(tournamentRuleVersions, {
-    relationName: "tournamentRuleVersions",
-  }),
-  prizes: many(tournamentPrizes),
-}));
-
-export const tournamentPrizesRelations = relations(
-  tournamentPrizes,
-  ({ one }) => ({
-    tournament: one(tournaments, {
-      fields: [tournamentPrizes.tournament_id],
-      references: [tournaments.id],
-    }),
-  }),
-);
-
-export const tournamentRuleVersionsRelations = relations(
-  tournamentRuleVersions,
-  ({ one, many }) => ({
-    tournament: one(tournaments, {
-      fields: [tournamentRuleVersions.tournament_id],
-      references: [tournaments.id],
-      relationName: "tournamentRuleVersions",
-    }),
-    publishedBy: one(profiles, {
-      fields: [tournamentRuleVersions.published_by],
-      references: [profiles.user_id],
-    }),
-    rules: many(tournamentRules),
-    acceptances: many(tournamentRuleAcceptances),
-  }),
-);
-
-export const tournamentRulesRelations = relations(tournamentRules, ({ one }) => ({
-  version: one(tournamentRuleVersions, {
-    fields: [tournamentRules.rule_version_id],
-    references: [tournamentRuleVersions.id],
-  }),
-}));
-
-export const tournamentRuleAcceptancesRelations = relations(
-  tournamentRuleAcceptances,
-  ({ one }) => ({
-    version: one(tournamentRuleVersions, {
-      fields: [tournamentRuleAcceptances.rule_version_id],
-      references: [tournamentRuleVersions.id],
-    }),
-    user: one(profiles, {
-      fields: [tournamentRuleAcceptances.user_id],
-      references: [profiles.user_id],
-    }),
+export const relations = defineRelations(
+  {
+    games,
+    gameModes,
+    modeTeamConfigurations,
+    tournaments,
+    tournamentPrizes,
+    tournamentRuleVersions,
+    tournamentRules,
+    tournamentRuleAcceptances,
+    profiles,
+  },
+  (r) => ({
+    games: {
+      modes: r.many.gameModes(),
+    },
+    gameModes: {
+      game: r.one.games({ from: r.gameModes.game_id, to: r.games.id }),
+      teamConfigurations: r.many.modeTeamConfigurations(),
+    },
+    modeTeamConfigurations: {
+      mode: r.one.gameModes({
+        from: r.modeTeamConfigurations.mode_id,
+        to: r.gameModes.id,
+      }),
+    },
+    tournaments: {
+      gameMode: r.one.gameModes({
+        from: r.tournaments.game_mode_id,
+        to: r.gameModes.id,
+      }),
+      teamConfiguration: r.one.modeTeamConfigurations({
+        from: r.tournaments.mode_team_configuration_id,
+        to: r.modeTeamConfigurations.id,
+      }),
+      creator: r.one.profiles({
+        from: r.tournaments.created_by,
+        to: r.profiles.user_id,
+      }),
+      ruleVersions: r.many.tournamentRuleVersions({
+        alias: "tournamentRuleVersions",
+      }),
+      prizes: r.many.tournamentPrizes(),
+    },
+    tournamentPrizes: {
+      tournament: r.one.tournaments({
+        from: r.tournamentPrizes.tournament_id,
+        to: r.tournaments.id,
+      }),
+    },
+    tournamentRuleVersions: {
+      tournament: r.one.tournaments({
+        from: r.tournamentRuleVersions.tournament_id,
+        to: r.tournaments.id,
+        alias: "tournamentRuleVersions",
+      }),
+      publishedBy: r.one.profiles({
+        from: r.tournamentRuleVersions.published_by,
+        to: r.profiles.user_id,
+      }),
+      rules: r.many.tournamentRules(),
+      acceptances: r.many.tournamentRuleAcceptances(),
+    },
+    tournamentRules: {
+      version: r.one.tournamentRuleVersions({
+        from: r.tournamentRules.rule_version_id,
+        to: r.tournamentRuleVersions.id,
+      }),
+    },
+    tournamentRuleAcceptances: {
+      version: r.one.tournamentRuleVersions({
+        from: r.tournamentRuleAcceptances.rule_version_id,
+        to: r.tournamentRuleVersions.id,
+      }),
+      user: r.one.profiles({
+        from: r.tournamentRuleAcceptances.user_id,
+        to: r.profiles.user_id,
+      }),
+    },
   }),
 );
 

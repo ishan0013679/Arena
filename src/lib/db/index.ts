@@ -15,7 +15,7 @@ export function getDb() {
 
   if (!_db) {
     const sql = postgres(url, { max: 5, prepare: false });
-    _db = drizzle(sql, { schema });
+    _db = drizzle({ client: sql, relations: schema.relations });
   }
 
   return _db;
