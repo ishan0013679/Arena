@@ -2,7 +2,6 @@
 // Application tables and their Drizzle schema definitions.
 
 import {
-  AnyPgColumn,
   boolean,
   check,
   foreignKey,
@@ -16,6 +15,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { AnyPgColumn, PgTableExtraConfigValue } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
 export const roleEnum = pgEnum("role", ["user", "admin"]);
@@ -198,6 +198,9 @@ export const tournaments = pgTable(
     starts_at: timestamp("starts_at", { withTimezone: true }).notNull(),
     ends_at: timestamp("ends_at", { withTimezone: true }),
     prize_summary: text("prize_summary"),
+    // The FK below allows NULL for draft tournaments; when set, it requires
+    // the rule version to belong to this tournament. Published status remains
+    // a server-side publication check.
     published_rules_version_id: uuid("published_rules_version_id").references(
       (): AnyPgColumn => tournamentRuleVersions.id,
       { onDelete: "restrict" },
@@ -213,11 +216,19 @@ export const tournaments = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [
+  (table): PgTableExtraConfigValue[] => [
     foreignKey({
       name: "tournaments_game_mode_team_configuration_fk",
       columns: [table.game_mode_id, table.mode_team_configuration_id],
       foreignColumns: [modeTeamConfigurations.mode_id, modeTeamConfigurations.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "tournaments_published_rules_version_ownership_fk",
+      columns: [table.id, table.published_rules_version_id],
+      foreignColumns: [
+        tournamentRuleVersions.tournament_id as AnyPgColumn,
+        tournamentRuleVersions.id as AnyPgColumn,
+      ],
     }).onDelete("restrict"),
     check("tournaments_max_entries_positive_check", sql`${table.max_entries} > 0`),
     check(
@@ -289,6 +300,8 @@ export const tournamentRuleVersions = pgTable(
       .notNull()
       .references(() => tournaments.id, { onDelete: "restrict" }),
     version_number: integer("version_number").notNull(),
+    // Published versions and their rules must be immutable; future server-side
+    // write operations enforce this. No database trigger is added in this phase.
     status: tournamentRuleVersionStatusEnum("status")
       .notNull()
       .default("draft"),
@@ -300,7 +313,7 @@ export const tournamentRuleVersions = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [
+  (table): PgTableExtraConfigValue[] => [
     check(
       "tournament_rule_versions_number_positive_check",
       sql`${table.version_number} > 0`,
@@ -312,6 +325,11 @@ export const tournamentRuleVersions = pgTable(
     uniqueIndex("tournament_rule_versions_tournament_version_unique").on(
       table.tournament_id,
       table.version_number,
+    ),
+    // Candidate key required by tournaments' ownership-checking composite FK.
+    uniqueIndex("tournament_rule_versions_tournament_id_id_unique").on(
+      table.tournament_id,
+      table.id,
     ),
   ],
 );
