@@ -166,12 +166,6 @@ export const modeTeamConfigurations = pgTable(
       table.mode_id,
       table.team_size,
     ),
-    // Supports tournaments' composite FK ensuring a selected configuration
-    // belongs to the selected game mode.
-    uniqueIndex("mode_team_configurations_mode_id_id_unique").on(
-      table.mode_id,
-      table.id,
-    ),
   ],
 );
 
@@ -201,10 +195,7 @@ export const tournaments = pgTable(
     // The FK below allows NULL for draft tournaments; when set, it requires
     // the rule version to belong to this tournament. Published status remains
     // a server-side publication check.
-    published_rules_version_id: uuid("published_rules_version_id").references(
-      (): AnyPgColumn => tournamentRuleVersions.id,
-      { onDelete: "restrict" },
-    ),
+    published_rules_version_id: uuid("published_rules_version_id"),
     banner_url: text("banner_url"),
     created_by: uuid("created_by")
       .notNull()
@@ -218,9 +209,14 @@ export const tournaments = pgTable(
   },
   (table): PgTableExtraConfigValue[] => [
     foreignKey({
-      name: "tournaments_game_mode_team_configuration_fk",
-      columns: [table.game_mode_id, table.mode_team_configuration_id],
-      foreignColumns: [modeTeamConfigurations.mode_id, modeTeamConfigurations.id],
+      name: "tournament_team_config_fk",
+      columns: [table.mode_team_configuration_id],
+      foreignColumns: [modeTeamConfigurations.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "tournament_published_rules_fk",
+      columns: [table.published_rules_version_id],
+      foreignColumns: [tournamentRuleVersions.id as AnyPgColumn],
     }).onDelete("restrict"),
     foreignKey({
       name: "tournaments_published_rules_version_ownership_fk",
@@ -338,9 +334,7 @@ export const tournamentRules = pgTable(
   "tournament_rules",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    rule_version_id: uuid("rule_version_id")
-      .notNull()
-      .references(() => tournamentRuleVersions.id, { onDelete: "restrict" }),
+    rule_version_id: uuid("rule_version_id").notNull(),
     title: text("title").notNull(),
     description: text("description").notNull(),
     category: tournamentRuleCategoryEnum("category").notNull(),
@@ -349,6 +343,11 @@ export const tournamentRules = pgTable(
     display_order: integer("display_order").notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "tournament_rules_version_fk",
+      columns: [table.rule_version_id],
+      foreignColumns: [tournamentRuleVersions.id],
+    }).onDelete("restrict"),
     check(
       "tournament_rules_display_order_nonnegative_check",
       sql`${table.display_order} >= 0`,
@@ -364,9 +363,7 @@ export const tournamentRuleAcceptances = pgTable(
   "tournament_rule_acceptances",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    rule_version_id: uuid("rule_version_id")
-      .notNull()
-      .references(() => tournamentRuleVersions.id, { onDelete: "restrict" }),
+    rule_version_id: uuid("rule_version_id").notNull(),
     user_id: uuid("user_id")
       .notNull()
       .references(() => profiles.user_id, { onDelete: "restrict" }),
@@ -375,6 +372,11 @@ export const tournamentRuleAcceptances = pgTable(
       .notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "tournament_rule_acceptances_version_fk",
+      columns: [table.rule_version_id],
+      foreignColumns: [tournamentRuleVersions.id],
+    }).onDelete("restrict"),
     uniqueIndex("tournament_rule_acceptances_user_version_unique").on(
       table.user_id,
       table.rule_version_id,
