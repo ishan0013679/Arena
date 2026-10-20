@@ -37,6 +37,7 @@ const accountNavigation = [
 ];
 
 const adminNavigation = [
+  { label: "Tournaments", href: "/console/tournaments", icon: Trophy },
   { label: "Games", href: "/console/games", icon: Gamepad2 },
 ];
 
