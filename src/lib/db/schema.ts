@@ -159,11 +159,6 @@ export const modeTeamConfigurations = pgTable(
       .notNull(),
   },
   (table) => [
-    // Candidate key required by tournaments' game-mode/team-configuration FK.
-    uniqueIndex("mode_team_configurations_mode_id_id_unique").on(
-      table.mode_id,
-      table.id,
-    ),
     // A given team size may only appear once per mode (e.g. no duplicate "Solo")
     uniqueIndex("mode_team_configurations_mode_id_team_size_unique").on(
       table.mode_id,
@@ -179,10 +174,9 @@ export const tournaments = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     description: text("description"),
-    game_mode_id: uuid("game_mode_id")
+    mode_team_configuration_id: uuid("mode_team_configuration_id")
       .notNull()
-      .references(() => gameModes.id, { onDelete: "restrict" }),
-    mode_team_configuration_id: uuid("mode_team_configuration_id"),
+      .references(() => modeTeamConfigurations.id, { onDelete: "restrict" }),
     tournament_format: tournamentFormatEnum("tournament_format").notNull(),
     status: tournamentStatusEnum("status").notNull().default("draft"),
     max_entries: integer("max_entries").notNull(),
@@ -212,14 +206,6 @@ export const tournaments = pgTable(
   },
   (table): PgTableExtraConfigValue[] => [
     foreignKey({
-      name: "tournaments_game_mode_team_configuration_fk",
-      columns: [table.game_mode_id, table.mode_team_configuration_id],
-      foreignColumns: [
-        modeTeamConfigurations.mode_id,
-        modeTeamConfigurations.id,
-      ],
-    }).onDelete("restrict"),
-    foreignKey({
       name: "tournament_published_rules_fk",
       columns: [table.published_rules_version_id],
       foreignColumns: [tournamentRuleVersions.id as AnyPgColumn],
@@ -245,7 +231,6 @@ export const tournaments = pgTable(
       "tournaments_end_after_start_check",
       sql`${table.ends_at} is null or ${table.ends_at} >= ${table.starts_at}`,
     ),
-    index("tournaments_game_mode_id_idx").on(table.game_mode_id),
     index("tournaments_mode_team_configuration_id_idx").on(
       table.mode_team_configuration_id,
     ),
@@ -424,10 +409,6 @@ export const relations = defineRelations(
       }),
     },
     tournaments: {
-      gameMode: r.one.gameModes({
-        from: r.tournaments.game_mode_id,
-        to: r.gameModes.id,
-      }),
       teamConfiguration: r.one.modeTeamConfigurations({
         from: r.tournaments.mode_team_configuration_id,
         to: r.modeTeamConfigurations.id,
