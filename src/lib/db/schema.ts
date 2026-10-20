@@ -159,8 +159,11 @@ export const modeTeamConfigurations = pgTable(
       .notNull(),
   },
   (table) => [
-    // Fast lookups of all configurations for a mode
-    index("mode_team_configurations_mode_id_idx").on(table.mode_id),
+    // Candidate key required by tournaments' game-mode/team-configuration FK.
+    uniqueIndex("mode_team_configurations_mode_id_id_unique").on(
+      table.mode_id,
+      table.id,
+    ),
     // A given team size may only appear once per mode (e.g. no duplicate "Solo")
     uniqueIndex("mode_team_configurations_mode_id_team_size_unique").on(
       table.mode_id,
@@ -209,9 +212,12 @@ export const tournaments = pgTable(
   },
   (table): PgTableExtraConfigValue[] => [
     foreignKey({
-      name: "tournament_team_config_fk",
-      columns: [table.mode_team_configuration_id],
-      foreignColumns: [modeTeamConfigurations.id],
+      name: "tournaments_game_mode_team_configuration_fk",
+      columns: [table.game_mode_id, table.mode_team_configuration_id],
+      foreignColumns: [
+        modeTeamConfigurations.mode_id,
+        modeTeamConfigurations.id,
+      ],
     }).onDelete("restrict"),
     foreignKey({
       name: "tournament_published_rules_fk",
