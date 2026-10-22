@@ -171,22 +171,21 @@ export const tournaments = pgTable(
   "tournaments",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
+    name: text("name"),
+    slug: text("slug").unique(),
     description: text("description"),
     mode_team_configuration_id: uuid("mode_team_configuration_id")
-      .notNull()
       .references(() => modeTeamConfigurations.id, { onDelete: "restrict" }),
-    tournament_format: tournamentFormatEnum("tournament_format").notNull(),
+    tournament_format: tournamentFormatEnum("tournament_format"),
     status: tournamentStatusEnum("status").notNull().default("draft"),
-    max_entries: integer("max_entries").notNull(),
+    max_entries: integer("max_entries"),
     registration_opens_at: timestamp("registration_opens_at", {
       withTimezone: true,
-    }).notNull(),
+    }),
     registration_closes_at: timestamp("registration_closes_at", {
       withTimezone: true,
-    }).notNull(),
-    starts_at: timestamp("starts_at", { withTimezone: true }).notNull(),
+    }),
+    starts_at: timestamp("starts_at", { withTimezone: true }),
     ends_at: timestamp("ends_at", { withTimezone: true }),
     prize_summary: text("prize_summary"),
     // The FK below allows NULL for draft tournaments; when set, it requires
@@ -218,18 +217,34 @@ export const tournaments = pgTable(
         tournamentRuleVersions.id as AnyPgColumn,
       ],
     }).onDelete("restrict"),
-    check("tournaments_max_entries_positive_check", sql`${table.max_entries} > 0`),
+    check(
+      "tournaments_non_draft_details_required_check",
+      sql`${table.status} = 'draft' or (
+        ${table.name} is not null and
+        ${table.slug} is not null and
+        ${table.mode_team_configuration_id} is not null and
+        ${table.tournament_format} is not null and
+        ${table.max_entries} is not null and
+        ${table.registration_opens_at} is not null and
+        ${table.registration_closes_at} is not null and
+        ${table.starts_at} is not null
+      )`,
+    ),
+    check(
+      "tournaments_max_entries_positive_check",
+      sql`${table.max_entries} is null or ${table.max_entries} > 0`,
+    ),
     check(
       "tournaments_registration_window_check",
-      sql`${table.registration_opens_at} < ${table.registration_closes_at}`,
+      sql`${table.registration_opens_at} is null or ${table.registration_closes_at} is null or ${table.registration_opens_at} < ${table.registration_closes_at}`,
     ),
     check(
       "tournaments_start_after_registration_check",
-      sql`${table.registration_closes_at} <= ${table.starts_at}`,
+      sql`${table.registration_closes_at} is null or ${table.starts_at} is null or ${table.registration_closes_at} <= ${table.starts_at}`,
     ),
     check(
       "tournaments_end_after_start_check",
-      sql`${table.ends_at} is null or ${table.ends_at} >= ${table.starts_at}`,
+      sql`${table.ends_at} is null or ${table.starts_at} is null or ${table.ends_at} >= ${table.starts_at}`,
     ),
     index("tournaments_mode_team_configuration_id_idx").on(
       table.mode_team_configuration_id,
